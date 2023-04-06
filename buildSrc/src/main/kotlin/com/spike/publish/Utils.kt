@@ -6,7 +6,6 @@ import org.gradle.api.attributes.Attribute
 import org.gradle.api.component.SoftwareComponentFactory
 import org.gradle.api.publish.PublishingExtension
 import org.gradle.api.publish.maven.MavenPublication
-import org.gradle.api.publish.tasks.GenerateModuleMetadata
 import org.gradle.api.tasks.SourceSet
 import org.gradle.api.tasks.SourceSetContainer
 import org.gradle.api.tasks.TaskProvider
@@ -44,27 +43,24 @@ object Utils {
             from(sourceSet.output)
         }
 
-//      FIXME works without .module file
-        project.tasks.withType(GenerateModuleMetadata::class.java) {
-            enabled = false
-//            enabled = true
-        }
-
         project.tasks.named(sourceSet.compileJavaTaskName) { dependsOn(generateTask) }
 
         val component = project.gradle.serviceOf<SoftwareComponentFactory>().adhoc(name)
 
-        val implementationConfiguration = project.configurations[sourceSet.implementationConfigurationName]
-
-        implementationConfiguration.attributes {
-            attribute(Attribute.of("org.gradle.category", String::class.java), "library")
-            attribute(Attribute.of("org.gradle.dependency.bundling", String::class.java), "external")
-            attribute(Attribute.of("org.gradle.jvm.version", Integer::class.java), Integer(17))
-            attribute(Attribute.of("org.gradle.libraryelements", String::class.java), "jar")
-            attribute(Attribute.of("org.gradle.usage", String::class.java), "java-runtime")
+        val variatConfiguration = project.configurations.create("${name}VariantElement") {
+            isCanBeConsumed = true
+            isCanBeResolved = false
+            attributes {
+                attribute(Attribute.of("org.gradle.category", String::class.java), "library")
+                attribute(Attribute.of("org.gradle.dependency.bundling", String::class.java), "external")
+                attribute(Attribute.of("org.gradle.jvm.version", Integer::class.java), Integer(17))
+                attribute(Attribute.of("org.gradle.libraryelements", String::class.java), "jar")
+                attribute(Attribute.of("org.gradle.usage", String::class.java), "java-runtime")
+            }
+            outgoing.artifact(jarTask)
         }
 
-        component.addVariantsFromConfiguration(implementationConfiguration) {
+        component.addVariantsFromConfiguration(variatConfiguration) {
             mapToMavenScope("runtime")
             mapToOptional()
         }
@@ -74,7 +70,6 @@ object Utils {
                 create<MavenPublication>(name) {
                     from(component)
                     artifactId = artifactName
-                    artifact(jarTask)
                 }
             }
         }
